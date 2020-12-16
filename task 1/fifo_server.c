@@ -2,70 +2,71 @@
 
 int main()
 {
+        signal(SIGINT, sigint_handler);
         setbuf(stdout, NULL);
         printf("Server is working. Press Ctrl + C to exit.\n");
         
-        char client_fifo[CLIENT_FIFO_NAME_LEN];
-        
-        int server_fd;
-        int client_fd;
-        
-        struct request req;
-        
         umask(0);
         if (mkfifo(SERVER_FIFO, 0666) == -1 && errno != EEXIST) {
-                perror("Error: cant't create fifo");
-                return errno;
-        }
-
-        if ((server_fd = open(SERVER_FIFO, O_RDWR, NULL)) == -1) {
-                perror("Error: can't open fifo");
+                perror("can't create server fifo");
                 return errno;
         }
         
-        signal(SIGPIPE, SIG_IGN);
+        int server_fd = -1;
+        if ((server_fd = open(SERVER_FIFO, O_RDONLY)) == -1) {
+                perror("can't open server fifo");
+                return errno;
+        }
         
-        while (1) {
+        struct request req;
+        while(keep_running) {
+                char client_fifo[CLIENT_FIFO_NAME_LEN];
                 if (read(server_fd, &req, sizeof(struct request)) != sizeof(struct request)) {
-                        perror("Error: can't read request");
                         continue;
                 }
-                printf("Request has came, client pid: %d; file: %s\n", req.pid, req.file_name);
+                printf("Request has been received, client pid: %d, path to file: %s\n", req.pid, req.file_name);
                 
                 snprintf(client_fifo, CLIENT_FIFO_NAME_LEN, CLIENT_FIFO_TEMPLATE, (long) req.pid);
-                if ((client_fd = open(client_fifo, O_WRONLY | O_NONBLOCK)) == -1) {
-                        perror("Error: can't open client fifo");
+                int client_fd = -1;
+                if ((client_fd = open(client_fifo, O_WRONLY)) == -1) {
+                        perror("can't open client fifo");
                         continue;
                 }
-                fcntl(client_fd, F_SETFL, fcntl(client_fd, F_GETFL) & ~O_NONBLOCK);
                 
-                FILE* file = fopen(req.file_name, "rb");
-                if (file == NULL) {
-                    perror("Error: can't open file");
-                    continue;
+                int file = -1;
+                if ((file = open(req.file_name, O_RDONLY, 0666)) == -1) {
+                        perror("can't open file");
+                        continue;
                 }
                 
-                char buf[PIPE_BUF] = "";
-                int size = 0;
+                void* buf = NULL;
+                if ((buf = malloc(PAGE_SIZE)) == NULL) {
+                        fprintf(stderr, "OOM\n");
+                        return -1;
+                }
                 
-                while ((size = fread(buf + 1, sizeof(char), PIPE_BUF - 1, file)) == PIPE_BUF - 1) {
-                        buf[0] = 0;
-                        if (write(client_fd, buf, PIPE_BUF) == -1) {
-                                perror("Error: can't send data to client");
-                                if (close(client_fd) == -1) {
-                                        perror("Error: can't close client fd");
-                                        return errno;
-                                }
+                for(;;) {
+                        int rd = -1;
+                        if ((rd = read(file, buf, PAGE_SIZE)) < 0) {
+                                perror("can't read from file");
+                                return errno;
+                        }
+                        if (rd == 0) {
                                 break;
                         }
+                        if (write(client_fd, buf, PAGE_SIZE) < 0) {
+                                perror("can't write data to client");
+                                return errno;
+                        }
+                        
                 }
-                
-                buf[0] = 1;
-                if (write(client_fd, buf, size + 1) == -1) {
-                        perror("Error: can't send last piece of data to client");
+                if (close(file) == -1) {
+                        perror("can't close file");
+                        return errno;
                 }
                 if (close(client_fd) == -1) {
-                        perror("Error: cant't close client fifo");
+                        perror("can't close client fifo");
+                        return errno;
                 }
         }
 }
