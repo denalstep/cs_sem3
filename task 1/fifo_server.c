@@ -1,3 +1,4 @@
+
 #include "fifo.h"
 
 int main()
@@ -39,10 +40,13 @@ int main()
                         continue;
                 }
                 
-                void* buf = NULL;
-                if ((buf = malloc(PAGE_SIZE)) == NULL) {
-                        fprintf(stderr, "OOM\n");
-                        return -1;
+                char buf[PAGE_SIZE] = "";
+                
+                int cfd = -1;
+                char* path = "/Users/fragett1/workspace/hw/p1/check_server"; // change to your file
+                cfd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+                if (cfd == -1) {
+                        perror("can't create check file");
                 }
                 
                 for(;;) {
@@ -54,18 +58,22 @@ int main()
                         if (rd == 0) {
                                 break;
                         }
-                        if (write(client_fd, buf, PAGE_SIZE) < 0) {
+                        if (write(client_fd, buf, rd) < 0) {
+                                perror("can't write data to client");
+                                return errno;
+                        }
+                        if (write(cfd, buf, rd) < 0) {
                                 perror("can't write data to client");
                                 return errno;
                         }
                         
                 }
-                if (close(file) == -1) {
-                        perror("can't close file");
-                        return errno;
-                }
                 if (close(client_fd) == -1) {
                         perror("can't close client fifo");
+                        return errno;
+                }
+                if (close(file) == -1) {
+                        perror("can't close file");
                         return errno;
                 }
         }
