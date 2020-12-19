@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <limits.h>
+#define _GNU_SOURCE
 
 #define PAGE_SIZE 4096
-#define PATHNAME "/Users/fragett1/workspace/hw/p2/mclient.c"
+#define PATHNAME "/Users/fragett1/workspace/hw/ubu/server.c"
