@@ -2,8 +2,6 @@
 
 int main (int argc, char* argv[])
 {
-        printf("Client %d has started.\n", getpid());
-        
         if (argc != 2) {
                 perror("invalid input");
                 exit(1);
@@ -35,7 +33,6 @@ int main (int argc, char* argv[])
         if (close(server_fd) == -1) {
                 perror("cant't close server fifo");
         }
-        printf("Request has been sent.\n");
         
         int client_fd = -1;
         if ((client_fd = open(client_fifo, O_RDONLY, NULL)) == -1) {
@@ -46,14 +43,6 @@ int main (int argc, char* argv[])
         
         char buf[PAGE_SIZE] = "";
         
-        int cfd = -1;
-        char* path = "/Users/fragett1/workspace/hw/p1/check_client"; // change to your file
-        cfd = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        if (cfd == -1) {
-                perror("can't create check file");
-        }
-        
-        printf("Received file:\n");
         while (1) {
                 int rd = -1;
                 if ((rd = read(client_fd, buf, PAGE_SIZE)) < 0) {
@@ -64,10 +53,6 @@ int main (int argc, char* argv[])
                         break;
                 }
                 if (write(1, buf, rd) < 0 ) {
-                        perror("can't write data from buffer");
-                        return errno;
-                }
-                if (write(cfd, buf, rd) < 0 ) {
                         perror("can't write data from buffer");
                         return errno;
                 }
